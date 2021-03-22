@@ -14,7 +14,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import utils
 from logger import Logger
-from replay_buffer import ReplayBuffer
+from replay_buffer import ReplayBuffer, FrameStackReplayBuffer
 from video import VideoRecorder
 
 torch.backends.cudnn.benchmark = True
@@ -79,10 +79,14 @@ class Workspace(object):
         ]
         self.agent = hydra.utils.instantiate(cfg.agent)
 
-        self.replay_buffer = ReplayBuffer(self.env.observation_space.shape,
-                                          self.env.action_space.shape,
-                                          cfg.replay_buffer_capacity,
-                                          self.cfg.image_pad, self.device)
+        # self.replay_buffer = ReplayBuffer(self.env.observation_space.shape,
+        #                                   self.env.action_space.shape,
+        #                                   cfg.replay_buffer_capacity,
+        #                                   self.cfg.image_pad, self.device)
+        self.replay_buffer = FrameStackReplayBuffer(self.env.observation_space.shape,
+                                                    self.env.action_space.shape,
+                                                    cfg.replay_buffer_capacity,
+                                                    self.cfg.image_pad, self.device, self.cfg.frame_stack)
 
         self.video_recorder = VideoRecorder(
             self.work_dir if cfg.save_video else None)
@@ -159,8 +163,19 @@ class Workspace(object):
             done_no_max = 0 if episode_step + 1 == self.env._max_episode_steps else done
             episode_reward += reward
 
+            # (chongyi zheng): example to add transition into FrameStackReplayBuffer
+            # 	frame_stack = 4, repeated_frame_dists + new_frame_dists
+            # 			episode_step = 0, [0, 0, 0] + [0]
+            # 			episode_step = 1, [-1, -1] + [-1, 0]
+            # 			episode_step = 2, [-2] + [-2 ,-1, 0]
+            # 			episode_step = 3, [] + [-3, -2, -1, 0]
+            #			...
+            new_frame_dists = [-idx for idx in reversed(range(0, min(episode_step + 1, self.cfg.frame_stack)))]
+            stack_frame_dists = np.array(
+                [-episode_step] * (self.cfg.frame_stack - len(new_frame_dists)) + new_frame_dists
+            )
             self.replay_buffer.add(obs, action, reward, next_obs, done,
-                                   done_no_max)
+                                   done_no_max, stack_frame_dists=stack_frame_dists)
 
             obs = next_obs
             episode_step += 1
