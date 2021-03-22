@@ -14,6 +14,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import utils
 from logger import Logger
+from utils import FrameStack
 from replay_buffer import ReplayBuffer, FrameStackReplayBuffer
 from video import VideoRecorder
 
@@ -83,7 +84,8 @@ class Workspace(object):
         #                                   self.env.action_space.shape,
         #                                   cfg.replay_buffer_capacity,
         #                                   self.cfg.image_pad, self.device)
-        self.replay_buffer = FrameStackReplayBuffer(self.env.observation_space.shape,
+        assert isinstance(self.env, FrameStack), 'must be frame stack environment'
+        self.replay_buffer = FrameStackReplayBuffer(self.env.unwrapped.observation_space.shape,
                                                     self.env.action_space.shape,
                                                     cfg.replay_buffer_capacity,
                                                     self.cfg.image_pad, self.device, self.cfg.frame_stack)
@@ -163,6 +165,8 @@ class Workspace(object):
             done_no_max = 0 if episode_step + 1 == self.env._max_episode_steps else done
             episode_reward += reward
 
+            # self.replay_buffer.add(obs, action, reward, next_obs, done,
+            #                        done_no_max)
             # (chongyi zheng): example to add transition into FrameStackReplayBuffer
             # 	frame_stack = 4, repeated_frame_dists + new_frame_dists
             # 			episode_step = 0, [0, 0, 0] + [0]
