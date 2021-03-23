@@ -100,8 +100,7 @@ class Actor(nn.Module):
         # constrain log_std inside [log_std_min, log_std_max]
         log_std = torch.tanh(log_std)
         log_std_min, log_std_max = self.log_std_bounds
-        log_std = log_std_min + 0.5 * (log_std_max - log_std_min) * (log_std +
-                                                                     1)
+        log_std = log_std_min + 0.5 * (log_std_max - log_std_min) * (log_std + 1)
         std = log_std.exp()
 
         self.outputs['mu'] = mu
@@ -178,8 +177,7 @@ class DRQAgent(object):
         self.actor = hydra.utils.instantiate(actor_cfg).to(self.device)
 
         self.critic = hydra.utils.instantiate(critic_cfg).to(self.device)
-        self.critic_target = hydra.utils.instantiate(critic_cfg).to(
-            self.device)
+        self.critic_target = hydra.utils.instantiate(critic_cfg).to(self.device)
         self.critic_target.load_state_dict(self.critic.state_dict())
 
         # tie conv layers between actor and critic
@@ -224,21 +222,18 @@ class DRQAgent(object):
             next_action = dist.rsample()
             log_prob = dist.log_prob(next_action).sum(-1, keepdim=True)
             target_Q1, target_Q2 = self.critic_target(next_obs, next_action)
-            target_V = torch.min(target_Q1,
-                                 target_Q2) - self.alpha.detach() * log_prob
+            target_V = torch.min(target_Q1, target_Q2) - self.alpha.detach() * log_prob
             target_Q = reward + (not_done * self.discount * target_V)
 
             dist_aug = self.actor(next_obs_aug)
             next_action_aug = dist_aug.rsample()
-            log_prob_aug = dist_aug.log_prob(next_action_aug).sum(-1,
-                                                                  keepdim=True)
-            target_Q1, target_Q2 = self.critic_target(next_obs_aug,
-                                                      next_action_aug)
+            log_prob_aug = dist_aug.log_prob(next_action_aug).sum(-1, keepdim=True)
+            target_Q1, target_Q2 = self.critic_target(next_obs_aug, next_action_aug)
             target_V = torch.min(
                 target_Q1, target_Q2) - self.alpha.detach() * log_prob_aug
             target_Q_aug = reward + (not_done * self.discount * target_V)
 
-            target_Q = (target_Q + target_Q_aug) / 2
+            target_Q = (target_Q + target_Q_aug) / 2  # K = 2
 
         # get current Q estimates
         current_Q1, current_Q2 = self.critic(obs, action)
@@ -248,7 +243,7 @@ class DRQAgent(object):
         Q1_aug, Q2_aug = self.critic(obs_aug, action)
 
         critic_loss += F.mse_loss(Q1_aug, target_Q) + F.mse_loss(
-            Q2_aug, target_Q)
+            Q2_aug, target_Q)  # M = 2
 
         logger.log('train_critic/loss', critic_loss, step)
 
