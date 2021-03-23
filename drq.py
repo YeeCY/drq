@@ -21,6 +21,12 @@ class Encoder(nn.Module):
         self.output_logits = False
         self.feature_dim = feature_dim
 
+        # convolution shapes:
+        #   (N, C, 84, 84)
+        #   (N, num_filters, 41, 41)
+        #   (N, num_filters, 39, 39)
+        #   (N, num_filters, 37, 37)
+        #   (N, num_filters, 35, 35)
         self.convs = nn.ModuleList([
             nn.Conv2d(obs_shape[0], self.num_filters, 3, stride=2),
             nn.Conv2d(self.num_filters, self.num_filters, 3, stride=1),
